@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kitty Synth k-100</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-canvas: #fce8f0;
+      --card-bg: #ffffff;
+      --panel-lavender: #ece5f6;
+      --ink-dark: #382a4d;
+      --accent-pink: #ff3b6c;
+      --accent-yellow: #fad355;
+      --screen-bg: #1c192b;
+      --green-phosphor: #4be896;
+    }
+
+    body {
+      font-family: 'Fredoka', cursive, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--ink-dark);
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    .font-screen {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Scaling viewport wrapper so synth always fits 100% of the screen height and width */
+    .viewport-scaler {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 12px;
+    }
+
+    .responsive-fit-box {
+      width: 820px;
+      max-width: 95vw;
+      max-height: 94vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      transform-origin: center center;
+    }
+
+    /* Chunky cartoon chassis with solid block shadow */
+    .retro-chassis {
+      background-color: var(--card-bg);
+      border: 4px solid var(--ink-dark);
+      border-radius: 34px;
+      box-shadow: 0 8px 0 var(--ink-dark);
+    }
+
+    .retro-btn {
+      border: 3.5px solid var(--ink-dark);
+      box-shadow: 0 4.5px 0 var(--ink-dark);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+    }
+    .retro-btn:active {
+      transform: translateY(3.5px);
+      box-shadow: 0 1px 0 var(--ink-dark);
+    }
+
+    /* Extended Piano Keys */
+    .key-white {
+      background: #ffffff;
+      border-right: 2px solid var(--ink-dark);
+      border-bottom: 3.5px solid var(--ink-dark);
+      border-left: 2px solid var(--ink-dark);
+      border-radius: 0 0 10px 10px;
+      transition: background 0.06s, transform 0.06s, box-shadow 0.06s;
+      cursor: pointer;
+    }
+    .key-white:active, .key-white.active-key {
+      background: #ffdbe9;
+      transform: translateY(3px);
+      box-shadow: inset 0 -3px 6px rgba(255, 59, 108, 0.4);
+    }
+
+    /* Elongated Black Keys */
+    .key-black {
+      background: var(--ink-dark);
+      border: 2px solid var(--ink-dark);
+      border-radius: 0 0 8px 8px;
+      z-index: 20;
+      cursor: pointer;
+      height: 100%;
+      transition: transform 0.06s, background 0.06s, box-shadow 0.06s;
+    }
+    .key-black:active, .key-black.active-key {
+      background: #ff3b6c;
+      transform: translateY(2.5px);
+      box-shadow: 0 0 14px rgba(255, 59, 108, 0.95);
+    }
+
+    /* Rotary Knobs matching the reference design */
+    .knob-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    .knob-wheel {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 3.5px solid var(--ink-dark);
+      background: #ffffff;
+      position: relative;
+      cursor: grab;
+      touch-action: none;
+    }
+    .knob-wheel:active {
+      cursor: grabbing;
+    }
+    .knob-indicator {
+      position: absolute;
+      width: 13px;
+      height: 3.5px;
+      background: var(--accent-pink);
+      border-radius: 2px;
+      top: calc(50% - 1.75px);
+      left: 50%;
+      transform-origin: 0% 50%;
+    }
+    .knob-marker-triangle {
+      position: absolute;
+      top: -8px;
+      left: calc(50% - 4px);
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 6px solid var(--ink-dark);
+    }
+
+    @keyframes floatParticle {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-7px) rotate(3deg); }
+    }
+    .float-item {
+      animation: floatParticle 5s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen overflow-hidden relative">
+
+  <!-- Ambient Floating Stars and Hearts -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+    <svg class="absolute top-16 left-12 w-6 h-6 text-[#fbe570] float-item opacity-90" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2L13.8 8.4L20 10.2L13.8 12L12 18.4L10.2 12L4 10.2L10.2 8.4L12 2Z"/>
+    </svg>
+    <svg class="absolute top-36 left-28 w-6 h-6 text-[#ff3b6c] float-item opacity-80" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation-delay: 1.2s;">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+    </svg>
+    <svg class="absolute top-20 right-20 w-7 h-7 text-[#fbe570] float-item opacity-90" viewBox="0 0 24 24" fill="currentColor" style="animation-delay: 2s;">
+      <path d="M12 2L13.8 8.4L20 10.2L13.8 12L12 18.4L10.2 12L4 10.2L10.2 8.4L12 2Z"/>
+    </svg>
+    <svg class="absolute top-44 right-32 w-6 h-6 text-[#ff3b6c] float-item opacity-80" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation-delay: 0.8s;">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+    </svg>
+    <svg class="absolute bottom-24 left-44 w-5 h-5 text-[#ff3b6c] float-item opacity-70" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation-delay: 2.6s;">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+    </svg>
+    <svg class="absolute bottom-14 right-36 w-6 h-6 text-[#ff3b6c] float-item opacity-80" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation-delay: 1.6s;">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+    </svg>
+  </div>
+
+  <div class="viewport-scaler relative z-10">
+    <!-- Screen 1: Landing Card -->
+    <div id="landingScreen" class="w-full max-w-[430px] retro-chassis p-6 sm:p-8 flex flex-col items-center text-center">
+
+      <!-- Series Badge -->
+      <div class="inline-flex items-center gap-2 border-[3px] border-[#382a4d] rounded-full px-4 py-1 mb-4 bg-[#faf5fa]">
+        <span class="text-sm font-bold text-[#382a4d]">♪</span>
+        <span class="text-[11px] font-extrabold tracking-wider text-[#382a4d] uppercase">KAWAII SYNTH SERIES</span>
+      </div>
+
+      <!-- Title -->
+      <h1 class="text-4xl sm:text-5xl font-black text-[#382a4d] tracking-tight mb-5">Kitty Synth</h1>
+
+      <!-- Hello Kitty Vector Art matching reference image -->
+      <div class="relative w-64 h-44 mb-6 flex items-center justify-center">
+        <svg viewBox="0 0 300 200" class="w-full h-full overflow-hidden" xmlns="http://www.w3.org/2000/svg">
+
+          <!-- Hello Kitty Head Contour -->
+          <path d="
+            M 112 58
+            C 106 38, 92 34, 86 36
+            C 80 38, 80 50, 78 64
+            C 58 92, 54 116, 58 132
+            C 66 160, 106 172, 150 172
+            C 194 172, 234 160, 242 132
+            C 246 116, 242 92, 222 64
+            C 220 50, 220 38, 214 36
+            C 208 34, 194 38, 188 58
+            C 170 54, 130 54, 112 58
+            Z
+          " fill="#ffffff" stroke="#382a4d" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+          <!-- 3 Whiskers Left -->
+          <path d="M 68 116 C 54 114, 40 111, 28 106" fill="none" stroke="#382a4d" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M 66 130 C 52 130, 38 130, 24 131" fill="none" stroke="#382a4d" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M 68 144 C 55 148, 42 153, 30 160" fill="none" stroke="#382a4d" stroke-width="4.5" stroke-linecap="round"/>
+
+          <!-- 3 Whiskers Right -->
+          <path d="M 232 116 C 246 114, 260 111, 272 106" fill="none" stroke="#382a4d" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M 234 130 C 248 130, 262 130, 276 131" fill="none" stroke="#382a4d" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M 232 144 C 245 148, 258 153, 270 160" fill="none" stroke="#382a4d" stroke-width="4.5" stroke-linecap="round"/>
+
+          <!-- Oval Eyes -->
+          <ellipse cx="114" cy="118" rx="6.5" ry="9" fill="#382a4d"/>
+          <ellipse cx="186" cy="118" rx="6.5" ry="9" fill="#382a4d"/>
+
+          <!-- Yellow Oval Nose with dark border -->
+          <ellipse cx="150" cy="126" rx="8" ry="5.5" fill="#fed85d" stroke="#382a4d" stroke-width="2.8"/>
+
+          <!-- Signature Bow on Right Ear -->
+          <g id="kitty-bow">
+            <circle cx="185" cy="52" r="10" fill="#ff2e63" stroke="#382a4d" stroke-width="4"/>
+            <circle cx="187" cy="68" r="10" fill="#ff2e63" stroke="#382a4d" stroke-width="4"/>
+            <circle cx="213" cy="56" r="10" fill="#ff2e63" stroke="#382a4d" stroke-width="4"/>
+            <circle cx="215" cy="72" r="10" fill="#ff2e63" stroke="#382a4d" stroke-width="4"/>
+            <circle cx="199" cy="62" r="8.5" fill="#ff2e63" stroke="#382a4d" stroke-width="4"/>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Play Synthesizer Button -->
+      <button id="btnOpenSynth" class="w-full max-w-[260px] py-2.5 px-6 rounded-2xl bg-[#ff3b6c] hover:bg-[#fa2561] text-white text-base sm:text-lg font-extrabold flex items-center justify-center gap-3 retro-btn cursor-pointer">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+          <circle cx="12" cy="12" r="8.5"/>
+          <polygon points="10,8 16,12 10,16" fill="white" stroke="none"/>
+        </svg>
+        <span>Play Synthesizer</span>
+      </button>
+    </div>
+
+    <!-- Screen 2: Responsive Auto-Fitted Synthesizer Chassis (Always fits the viewport without overflow) -->
+    <div id="synthScreen" class="hidden responsive-fit-box retro-chassis p-4 sm:p-5 flex-col justify-between">
+
+      <!-- Top Header Bar -->
+      <div class="flex items-center justify-between mb-3 w-full">
+        <!-- Back to Home Button -->
+        <button id="btnBackHome" class="flex items-center gap-2 px-3 py-1 rounded-xl bg-white text-[#382a4d] font-extrabold text-xs sm:text-sm retro-btn cursor-pointer hover:bg-pink-50">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+          </svg>
+          <span>Home</span>
+        </button>
+
+        <!-- Center Synth Branding -->
+        <div class="flex items-center gap-2">
+          <span class="inline-block w-3 h-3 rounded-full bg-[#ff3b6c] border-2 border-[#382a4d]"></span>
+          <h2 class="text-xl sm:text-2xl font-black text-[#382a4d] tracking-tight">Kitty Synth <span class="text-sm sm:text-base font-bold text-[#ff3b6c]">k-100</span></h2>
+        </div>
+
+        <!-- Right Yellow Magic Star Button (Plays the Hello Kitty Melody) -->
+        <button id="btnMelodyStar" title="Слушать мелодию Hello Kitty!" class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#fad355] hover:bg-[#ff3b6c] hover:text-white flex items-center justify-center retro-btn cursor-pointer transition-colors">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5 text-[#382a4d]" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L13.8 8.4L20 10.2L13.8 12L12 18.4L10.2 12L4 10.2L10.2 8.4L12 2Z"/>
+            <circle cx="18" cy="18" r="1.5"/>
+            <circle cx="6" cy="18" r="1.2"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Upper Row: Oscilloscope & Waveform Selector -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-3 w-full">
+
+        <!-- Green Cathode Screen / Oscilloscope -->
+        <div class="md:col-span-8 bg-[#1c192b] rounded-2xl border-[3.5px] border-[#382a4d] p-2.5 text-[#4be896] font-screen relative flex flex-col justify-between overflow-hidden shadow-inner h-[105px] sm:h-[115px]">
+          <div class="flex justify-between items-center text-[10px] sm:text-[11px] tracking-wider uppercase font-bold z-10">
+            <span id="screenOscMode">OSCIL // SINE_WAVE</span>
+            <span id="screenFreq" class="text-emerald-300">440.00 Hz</span>
+          </div>
+
+          <canvas id="scopeCanvas" class="absolute inset-0 w-full h-full opacity-95"></canvas>
+
+          <div class="flex justify-between items-center text-[9px] sm:text-[10px] tracking-wide z-10 text-[#4be896]/80 font-bold">
+            <span id="screenVolDisplay">VOL: 78%</span>
+            <span id="screenThemeTag" class="text-yellow-300">READY</span>
+            <span id="screenLfoDisplay">LFO: 3.2Hz</span>
+          </div>
+        </div>
+
+        <!-- Waveform Selector -->
+        <div class="md:col-span-4 bg-[#ece5f6] rounded-2xl border-[3.5px] border-[#382a4d] p-2.5 flex flex-col justify-between">
+          <div class="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-[#382a4d] mb-1.5 text-center">
+            WAVEFORM SELECTOR
+          </div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <!-- Sine -->
+            <button data-wave="sine" class="wave-opt-btn active flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-[11px] sm:text-xs font-black border-2 border-[#382a4d] bg-[#ff3b6c] text-white transition-all cursor-pointer">
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 12c4-8 8-8 10 0s6 8 10 0"/></svg>
+              <span>Sine</span>
+            </button>
+            <!-- Square -->
+            <button data-wave="square" class="wave-opt-btn flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-[11px] sm:text-xs font-black border-2 border-[#382a4d] bg-white text-[#382a4d] hover:bg-pink-100 transition-all cursor-pointer">
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17V7h9v10h9"/></svg>
+              <span>Square</span>
+            </button>
+            <!-- Saw -->
+            <button data-wave="sawtooth" class="wave-opt-btn flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-[11px] sm:text-xs font-black border-2 border-[#382a4d] bg-white text-[#382a4d] hover:bg-pink-100 transition-all cursor-pointer">
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17L12 7v10L21 7v10"/></svg>
+              <span>Saw</span>
+            </button>
+            <!-- Triangle -->
+            <button data-wave="triangle" class="wave-opt-btn flex items-center justify-center gap-1.5 py-1 px-2 rounded-xl text-[11px] sm:text-xs font-black border-2 border-[#382a4d] bg-white text-[#382a4d] hover:bg-pink-100 transition-all cursor-pointer">
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17L12 7l9 10"/></svg>
+              <span>Triangle</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle Row: 5 Knobs exactly matching reference design -->
+      <div class="grid grid-cols-5 gap-1.5 sm:gap-3 mb-3 px-1 w-full">
+
+        <!-- Knob 1: VOLUME -->
+        <div class="knob-container">
+          <div class="knob-wheel scale-90 sm:scale-100" id="knobVol" data-param="vol" data-min="0" data-max="1" data-val="0.78" data-angle="-30">
+            <div class="knob-marker-triangle"></div>
+            <div class="knob-indicator" style="transform: rotate(-30deg);"></div>
+          </div>
+          <span class="text-[10px] font-black uppercase text-[#382a4d] mt-1.5">VOLUME</span>
+          <span class="text-[10px] font-bold text-[#ff3b6c]" id="valVol">78%</span>
+        </div>
+
+        <!-- Knob 2: FILTER CUT -->
+        <div class="knob-container">
+          <div class="knob-wheel scale-90 sm:scale-100" id="knobCut" data-param="cut" data-min="300" data-max="7000" data-val="1200" data-angle="-40">
+            <div class="knob-marker-triangle"></div>
+            <div class="knob-indicator" style="transform: rotate(-40deg);"></div>
+          </div>
+          <span class="text-[10px] font-black uppercase text-[#382a4d] mt-1.5">FILTER CUT</span>
+          <span class="text-[10px] font-bold text-[#ff3b6c]" id="valCut">1.2kHz</span>
+        </div>
+
+        <!-- Knob 3: REVERB -->
+        <div class="knob-container">
+          <div class="knob-wheel scale-90 sm:scale-100" id="knobRev" data-param="rev" data-min="0" data-max="0.8" data-val="0.45" data-angle="45">
+            <div class="knob-marker-triangle"></div>
+            <div class="knob-indicator" style="transform: rotate(45deg);"></div>
+          </div>
+          <span class="text-[10px] font-black uppercase text-[#382a4d] mt-1.5">REVERB</span>
+          <span class="text-[10px] font-bold text-[#ff3b6c]" id="valRev">55ms</span>
+        </div>
+
+        <!-- Knob 4: LFO RATE -->
+        <div class="knob-container">
+          <div class="knob-wheel scale-90 sm:scale-100" id="knobLfo" data-param="lfo" data-min="0.5" data-max="12" data-val="3.2" data-angle="-15">
+            <div class="knob-marker-triangle"></div>
+            <div class="knob-indicator" style="transform: rotate(-15deg);"></div>
+          </div>
+          <span class="text-[10px] font-black uppercase text-[#382a4d] mt-1.5">LFO RATE</span>
+          <span class="text-[10px] font-bold text-[#ff3b6c]" id="valLfo">3.2Hz</span>
+        </div>
+
+        <!-- Knob 5: SUSTAIN -->
+        <div class="knob-container">
+          <div class="knob-wheel scale-90 sm:scale-100" id="knobSus" data-param="sus" data-min="0.1" data-max="1.5" data-val="1.2" data-angle="75">
+            <div class="knob-marker-triangle"></div>
+            <div class="knob-indicator" style="transform: rotate(75deg);"></div>
+          </div>
+          <span class="text-[10px] font-black uppercase text-[#382a4d] mt-1.5">SUSTAIN</span>
+          <span class="text-[10px] font-bold text-[#ff3b6c]" id="valSus">MAX</span>
+        </div>
+      </div>
+
+      <!-- Piano Keyboard Chassis Container: Keys spanning the FULL length -->
+      <div class="relative bg-[#ece5f6] rounded-2xl border-[3.5px] border-[#382a4d] p-2.5 sm:p-3 shadow-inner w-full">
+        <div class="relative w-full h-36 sm:h-40 overflow-hidden rounded-xl border-2 border-[#382a4d] select-none bg-white">
+          <!-- White Keys Row spanning 100% -->
+          <div id="whiteKeyRow" class="flex w-full h-full"></div>
+          <!-- Black Keys Overlay Row with elongated length (70% height) -->
+          <div id="blackKeyRow" class="absolute inset-0 pointer-events-none flex h-[70%]"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const synthAudio = {
+      ctx: null,
+      masterGain: null,
+      filter: null,
+      delay: null,
+      delayGain: null,
+      analyser: null,
+      wave: 'sine',
+      volume: 0.78,
+      cutoff: 1200,
+      reverb: 0.45,
+      lfoRate: 3.2,
+      sustain: 1.2,
+      activeVoices: new Map(),
+      isPlayingTheme: false
+    };
+
+    // Sequential White Keys: 15 notes across full keyboard
+    const WHITE_NOTES = [
+      { note: 'C3', freq: 130.81, char: 'Q', ruChar: 'Й', hasHeartLabel: true, label: 'C3' },
+      { note: 'D3', freq: 146.83, char: 'W', ruChar: 'Ц' },
+      { note: 'E3', freq: 164.81, char: 'E', ruChar: 'У' },
+      { note: 'F3', freq: 174.61, char: 'R', ruChar: 'К' },
+      { note: 'G3', freq: 196.00, char: 'T', ruChar: 'Е' },
+      { note: 'A3', freq: 220.00, char: 'Y', ruChar: 'Н' },
+      { note: 'B3', freq: 246.94, char: 'U', ruChar: 'Г' },
+      { note: 'C4', freq: 261.63, char: 'I', ruChar: 'Ш', hasHeartLabel: true, label: 'C4' },
+      { note: 'D4', freq: 293.66, char: 'O', ruChar: 'Щ' },
+      { note: 'E4', freq: 329.63, char: 'P', ruChar: 'З' },
+      { note: 'F4', freq: 349.23, char: 'Z', ruChar: 'Я', altChar: '[' },
+      { note: 'G4', freq: 392.00, char: 'X', ruChar: 'Ч', altChar: ']' },
+      { note: 'A4', freq: 440.00, char: 'C', ruChar: 'С' },
+      { note: 'B4', freq: 493.88, char: 'V', ruChar: 'М' },
+      { note: 'C5', freq: 523.25, char: 'B', ruChar: 'И', hasHeartLabel: true, label: 'C5' }
+    ];
+
+    // Sequential Black Keys: 10 notes mapped to 1..0
+    const BLACK_NOTES = [
+      { note: 'C#3', freq: 138.59, char: '1', slot: 0 },
+      { note: 'D#3', freq: 155.56, char: '2', slot: 1 },
+      { note: 'F#3', freq: 185.00, char: '3', slot: 3 },
+      { note: 'G#3', freq: 207.65, char: '4', slot: 4 },
+      { note: 'A#3', freq: 233.08, char: '5', slot: 5 },
+      { note: 'C#4', freq: 277.18, char: '6', slot: 7 },
+      { note: 'D#4', freq: 311.13, char: '7', slot: 8 },
+      { note: 'F#4', freq: 369.99, char: '8', slot: 10 },
+      { note: 'G#4', freq: 415.30, char: '9', slot: 11 },
+      { note: 'A#4', freq: 466.16, char: '0', slot: 12 }
+    ];
+
+    function ensureAudioContext() {
+      if (synthAudio.ctx) {
+        if (synthAudio.ctx.state === 'suspended') {
+          synthAudio.ctx.resume();
+        }
+        return;
+      }
+
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioContext();
+      synthAudio.ctx = ctx;
+
+      // Master Gain
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(synthAudio.volume, ctx.currentTime);
+
+      // Lowpass Filter
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(synthAudio.cutoff, ctx.currentTime);
+      filter.Q.setValueAtTime(2.0, ctx.currentTime);
+
+      // Stereo Reverb Delay with bandpass feedback
+      const delay = ctx.createDelay();
+      delay.delayTime.value = 0.22;
+      const delayFeedback = ctx.createGain();
+      delayFeedback.gain.value = synthAudio.reverb * 0.6;
+      const delayTone = ctx.createBiquadFilter();
+      delayTone.type = 'bandpass';
+      delayTone.frequency.value = 2000;
+
+      delay.connect(delayTone);
+      delayTone.connect(delayFeedback);
+      delayFeedback.connect(delay);
+
+      const delayWet = ctx.createGain();
+      delayWet.gain.value = synthAudio.reverb;
+      delay.connect(delayWet);
+
+      // Green Oscilloscope Analyser
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+
+      // Routing
+      filter.connect(master);
+      filter.connect(delay);
+      delayWet.connect(master);
+
+      master.connect(analyser);
+      analyser.connect(ctx.destination);
+
+      synthAudio.masterGain = master;
+      synthAudio.filter = filter;
+      synthAudio.delay = delay;
+      synthAudio.delayGain = delayWet;
+      synthAudio.analyser = analyser;
+
+      startScopeVisualizer();
+    }
+
+    function triggerNoteOn(freq, noteName) {
+      ensureAudioContext();
+      const ctx = synthAudio.ctx;
+      if (!ctx) return;
+
+      if (synthAudio.activeVoices.has(noteName)) {
+        triggerNoteOff(noteName);
+      }
+
+      const now = ctx.currentTime;
+
+      // VOICE 1: Lead Bell / Chime (Panned Left -0.45)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      const pan1 = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+
+      osc1.type = synthAudio.wave;
+      osc1.frequency.setValueAtTime(freq, now);
+
+      gain1.gain.setValueAtTime(0.0001, now);
+      gain1.gain.linearRampToValueAtTime(0.36, now + 0.015);
+      gain1.gain.exponentialRampToValueAtTime(0.24, now + 0.16);
+
+      if (pan1) {
+        pan1.pan.setValueAtTime(-0.45, now);
+        osc1.connect(gain1);
+        gain1.connect(pan1);
+        pan1.connect(synthAudio.filter);
+      } else {
+        osc1.connect(gain1);
+        gain1.connect(synthAudio.filter);
+      }
+
+      // VOICE 2: Shimmer Pad with Detune and LFO Vibrato (Panned Right +0.45)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      const pan2 = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+
+      osc2.type = synthAudio.wave === 'sine' ? 'triangle' : synthAudio.wave;
+      osc2.frequency.setValueAtTime(freq * 1.0048, now); // +8 cents detune for warm stereo width
+
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
+      lfo.frequency.setValueAtTime(synthAudio.lfoRate, now);
+      lfoGain.gain.setValueAtTime(4.2, now);
+      lfo.connect(osc2.frequency);
+      lfo.start(now);
+
+      gain2.gain.setValueAtTime(0.0001, now);
+      gain2.gain.linearRampToValueAtTime(0.26, now + 0.035);
+
+      if (pan2) {
+        pan2.pan.setValueAtTime(0.45, now);
+        osc2.connect(gain2);
+        gain2.connect(pan2);
+        pan2.connect(synthAudio.filter);
+      } else {
+        osc2.connect(gain2);
+        gain2.connect(synthAudio.filter);
+      }
+
+      osc1.start(now);
+      osc2.start(now);
+
+      synthAudio.activeVoices.set(noteName, { osc1, gain1, osc2, gain2, lfo });
+
+      const screenFreq = document.getElementById('screenFreq');
+      if (screenFreq) screenFreq.textContent = `${freq.toFixed(2)} Hz`;
+      setKeyHighlight(noteName, true);
+    }
+
+    function triggerNoteOff(noteName) {
+      if (!synthAudio.activeVoices.has(noteName) || !synthAudio.ctx) return;
+
+      const voice = synthAudio.activeVoices.get(noteName);
+      const ctx = synthAudio.ctx;
+      const now = ctx.currentTime;
+      const releaseDur = Math.max(0.08, synthAudio.sustain * 0.38);
+
+      try {
+        voice.gain1.gain.cancelScheduledValues(now);
+        voice.gain1.gain.setValueAtTime(voice.gain1.gain.value, now);
+        voice.gain1.gain.exponentialRampToValueAtTime(0.0001, now + releaseDur);
+
+        voice.gain2.gain.cancelScheduledValues(now);
+        voice.gain2.gain.setValueAtTime(voice.gain2.gain.value, now);
+        voice.gain2.gain.exponentialRampToValueAtTime(0.0001, now + releaseDur);
+
+        voice.osc1.stop(now + releaseDur + 0.05);
+        voice.osc2.stop(now + releaseDur + 0.05);
+        voice.lfo.stop(now + releaseDur + 0.05);
+      } catch (err) {}
+
+      synthAudio.activeVoices.delete(noteName);
+      setKeyHighlight(noteName, false);
+    }
+
+    function buildPiano() {
+      const whiteRow = document.getElementById('whiteKeyRow');
+      const blackRow = document.getElementById('blackKeyRow');
+      if (!whiteRow || !blackRow) return;
+
+      whiteRow.innerHTML = '';
+      blackRow.innerHTML = '';
+
+      const totalWhite = WHITE_NOTES.length;
+
+      // 1. Build White Keys across full length
+      WHITE_NOTES.forEach((wKey) => {
+        const el = document.createElement('div');
+        el.className = 'key-white flex-1 flex flex-col justify-end items-center pb-2 select-none relative';
+        el.id = `key-${wKey.note}`;
+
+        if (wKey.hasHeartLabel) {
+          el.innerHTML = `
+            <svg class="w-2.5 h-2.5 text-[#ff3b6c] mb-0.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+            </svg>
+            <span class="text-[9px] font-black text-[#382a4d] leading-none">${wKey.label}</span>
+          `;
+        }
+
+        el.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          triggerNoteOn(wKey.freq, wKey.note);
+        });
+        el.addEventListener('mouseup', () => triggerNoteOff(wKey.note));
+        el.addEventListener('mouseleave', () => triggerNoteOff(wKey.note));
+
+        el.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          triggerNoteOn(wKey.freq, wKey.note);
+        }, { passive: false });
+        el.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          triggerNoteOff(wKey.note);
+        });
+
+        whiteRow.appendChild(el);
+      });
+
+      // 2. Build Elongated Black Keys with pink dot indicator
+      BLACK_NOTES.forEach((bKey) => {
+        const el = document.createElement('div');
+        el.className = 'key-black pointer-events-auto absolute flex flex-col justify-end items-center pb-2 select-none';
+        el.id = `key-${bKey.note.replace('#', 's')}`;
+
+        // Width balanced for full-width layout (approx 4.2% of total width)
+        const keyWidthPct = 4.2;
+        const whiteSlotWidth = 100 / totalWhite;
+        const leftPct = ((bKey.slot + 1) * whiteSlotWidth) - (keyWidthPct / 2);
+
+        el.style.width = `${keyWidthPct}%`;
+        el.style.left = `${leftPct}%`;
+
+        // Pink dot at the bottom tip matching original art
+        el.innerHTML = `
+          <div class="w-2 h-2 rounded-full bg-[#ff3b6c] shadow-[0_0_5px_#ff3b6c]"></div>
+        `;
+
+        el.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          triggerNoteOn(bKey.freq, bKey.note);
+        });
+        el.addEventListener('mouseup', (e) => {
+          e.stopPropagation();
+          triggerNoteOff(bKey.note);
+        });
+        el.addEventListener('mouseleave', () => triggerNoteOff(bKey.note));
+
+        el.addEventListener('touchstart', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          triggerNoteOn(bKey.freq, bKey.note);
+        }, { passive: false });
+        el.addEventListener('touchend', (e) => {
+          e.stopPropagation();
+          triggerNoteOff(bKey.note);
+        });
+
+        blackRow.appendChild(el);
+      });
+    }
+
+    function setKeyHighlight(noteName, active) {
+      const cleanId = `key-${noteName.replace('#', 's')}`;
+      const el = document.getElementById(cleanId);
+      if (!el) return;
+      if (active) {
+        el.classList.add('active-key');
+      } else {
+        el.classList.remove('active-key');
+      }
+    }
+
+    // Key mappings: Top numbers 1..0 for Black Keys, Top letters Q..B for White Keys
+    const keyboardBindingMap = {};
+
+    WHITE_NOTES.forEach(k => {
+      keyboardBindingMap[k.char.toLowerCase()] = k;
+      keyboardBindingMap[k.char.toUpperCase()] = k;
+      if (k.ruChar) {
+        keyboardBindingMap[k.ruChar.toLowerCase()] = k;
+        keyboardBindingMap[k.ruChar.toUpperCase()] = k;
+      }
+      if (k.altChar) {
+        keyboardBindingMap[k.altChar] = k;
+      }
+    });
+
+    BLACK_NOTES.forEach(k => {
+      keyboardBindingMap[k.char] = k;
+    });
+
+    const activeKeysHeld = new Set();
+
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      const key = e.key;
+      if (keyboardBindingMap[key] && !activeKeysHeld.has(key)) {
+        activeKeysHeld.add(key);
+        const target = keyboardBindingMap[key];
+        triggerNoteOn(target.freq, target.note);
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const key = e.key;
+      if (keyboardBindingMap[key]) {
+        activeKeysHeld.delete(key);
+        const target = keyboardBindingMap[key];
+        triggerNoteOff(target.note);
+      }
+    });
+
+    function initRotaryKnob(id, onChange) {
+      const knob = document.getElementById(id);
+      if (!knob) return;
+
+      let isDragging = false;
+      let startY = 0;
+      let currentAngle = parseFloat(knob.dataset.angle) || 0;
+
+      const minVal = parseFloat(knob.dataset.min);
+      const maxVal = parseFloat(knob.dataset.max);
+
+      function applyAngle(angle) {
+        angle = Math.max(-135, Math.min(135, angle));
+        currentAngle = angle;
+        knob.dataset.angle = angle;
+        const line = knob.querySelector('.knob-indicator');
+        if (line) {
+          line.style.transform = `rotate(${angle}deg)`;
+        }
+        const progress = (angle + 135) / 270;
+        const val = minVal + progress * (maxVal - minVal);
+        knob.dataset.val = val;
+        onChange(val);
+      }
+
+      function onDown(clientY) {
+        ensureAudioContext();
+        isDragging = true;
+        startY = clientY;
+      }
+      function onMove(clientY) {
+        if (!isDragging) return;
+        const delta = startY - clientY;
+        startY = clientY;
+        applyAngle(currentAngle + delta * 2.2);
+      }
+      function onUp() {
+        isDragging = false;
+      }
+
+      knob.addEventListener('mousedown', (e) => onDown(e.clientY));
+      window.addEventListener('mousemove', (e) => onMove(e.clientY));
+      window.addEventListener('mouseup', onUp);
+
+      knob.addEventListener('touchstart', (e) => onDown(e.touches[0].clientY), { passive: true });
+      window.addEventListener('touchmove', (e) => {
+        if (isDragging) onMove(e.touches[0].clientY);
+      }, { passive: true });
+      window.addEventListener('touchend', onUp);
+
+      knob.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        ensureAudioContext();
+        applyAngle(currentAngle + (e.deltaY < 0 ? 12 : -12));
+      });
+    }
+
+    initRotaryKnob('knobVol', (val) => {
+      synthAudio.volume = val;
+      const pct = Math.round(val * 100);
+      const valVol = document.getElementById('valVol');
+      const screenVol = document.getElementById('screenVolDisplay');
+      if (valVol) valVol.textContent = `${pct}%`;
+      if (screenVol) screenVol.textContent = `VOL: ${pct}%`;
+      if (synthAudio.masterGain && synthAudio.ctx) {
+        synthAudio.masterGain.gain.setValueAtTime(val, synthAudio.ctx.currentTime);
+      }
+    });
+
+    initRotaryKnob('knobCut', (val) => {
+      synthAudio.cutoff = val;
+      const khz = (val / 1000).toFixed(1);
+      const valCut = document.getElementById('valCut');
+      if (valCut) valCut.textContent = `${khz}kHz`;
+      if (synthAudio.filter && synthAudio.ctx) {
+        synthAudio.filter.frequency.setValueAtTime(val, synthAudio.ctx.currentTime);
+      }
+    });
+
+    initRotaryKnob('knobRev', (val) => {
+      synthAudio.reverb = val;
+      const ms = Math.round(val * 120);
+      const valRev = document.getElementById('valRev');
+      if (valRev) valRev.textContent = `${ms}ms`;
+      if (synthAudio.delayGain && synthAudio.ctx) {
+        synthAudio.delayGain.gain.setValueAtTime(val, synthAudio.ctx.currentTime);
+      }
+    });
+
+    initRotaryKnob('knobLfo', (val) => {
+      synthAudio.lfoRate = val;
+      const hz = val.toFixed(1);
+      const valLfo = document.getElementById('valLfo');
+      const screenLfo = document.getElementById('screenLfoDisplay');
+      if (valLfo) valLfo.textContent = `${hz}Hz`;
+      if (screenLfo) screenLfo.textContent = `LFO: ${hz}Hz`;
+    });
+
+    initRotaryKnob('knobSus', (val) => {
+      synthAudio.sustain = val;
+      const valSus = document.getElementById('valSus');
+      if (valSus) {
+        valSus.textContent = val > 1.0 ? 'MAX' : (val > 0.5 ? 'HIGH' : 'SHORT');
+      }
+    });
+
+    document.querySelectorAll('.wave-opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        ensureAudioContext();
+        document.querySelectorAll('.wave-opt-btn').forEach(b => {
+          b.classList.remove('bg-[#ff3b6c]', 'text-white');
+          b.classList.add('bg-white', 'text-[#382a4d]');
+        });
+        btn.classList.add('bg-[#ff3b6c]', 'text-white');
+        btn.classList.remove('bg-white', 'text-[#382a4d]');
+
+        synthAudio.wave = btn.dataset.wave;
+        const screenMode = document.getElementById('screenOscMode');
+        if (screenMode) {
+          screenMode.textContent = `OSCIL // ${synthAudio.wave.toUpperCase()}_WAVE`;
+        }
+      });
+    });
+
+    function startScopeVisualizer() {
+      const canvas = document.getElementById('scopeCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const analyser = synthAudio.analyser;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      function fitCanvas() {
+        if (!canvas.parentElement) return;
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+      }
+      fitCanvas();
+      window.addEventListener('resize', fitCanvas);
+
+      function renderLoop() {
+        requestAnimationFrame(renderLoop);
+        analyser.getByteTimeDomainData(dataArray);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Dot matrix grid pattern
+        ctx.fillStyle = 'rgba(75, 232, 150, 0.08)';
+        for (let x = 12; x < canvas.width; x += 22) {
+          for (let y = 12; y < canvas.height; y += 22) {
+            ctx.beginPath();
+            ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // Green Wave Line
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#4be896';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#4be896';
+        ctx.beginPath();
+
+        const sliceWidth = canvas.width / bufferLength;
+        let x = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] / 128.0;
+          const y = (v * canvas.height) / 2;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+          x += sliceWidth;
+        }
+        ctx.stroke();
+
+        // Green marker dots along waveform
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = '#4be896';
+        const numMarkers = 11;
+        const step = Math.floor(bufferLength / numMarkers);
+        for (let j = 1; j < numMarkers; j++) {
+          const idx = j * step;
+          const px = (canvas.width / numMarkers) * j;
+          const py = (dataArray[idx] / 128.0) * (canvas.height / 2);
+          ctx.beginPath();
+          ctx.arc(px, py, 3.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      renderLoop();
+    }
+
+    // Rich, animated Kawaii Anime theme in C Major with rhythmic syncopation & chromatic magic
+    const kittyThemeNotes = [
+      // Фраза 1: Приветствие Китти (Игривое вступление)
+      { note: 'C4', duration: 220 },
+      { note: 'E4', duration: 220 },
+      { note: 'G4', duration: 220 },
+      { note: 'A4', duration: 320 },
+      { note: 'G4', duration: 220 },
+      { note: 'E4', duration: 220 },
+      { note: 'D4', duration: 180 },
+      { note: 'E4', duration: 180 },
+      { note: 'D4', duration: 260 },
+      { note: 'C4', duration: 380 },
+      { note: 'rest', duration: 120 },
+
+      // Фраза 2: Танец бантика (Прыгучий припев с взлетом на верхнее C5)
+      { note: 'E4', duration: 190 },
+      { note: 'G4', duration: 190 },
+      { note: 'A4', duration: 240 },
+      { note: 'C5', duration: 360 },
+      { note: 'B4', duration: 200 },
+      { note: 'A4', duration: 200 },
+      { note: 'G4', duration: 300 },
+      { note: 'E4', duration: 200 },
+      { note: 'F4', duration: 200 },
+      { note: 'A4', duration: 240 },
+      { note: 'G4', duration: 320 },
+      { note: 'E4', duration: 200 },
+      { note: 'D4', duration: 360 },
+      { note: 'rest', duration: 140 },
+
+      // Фраза 3: Волшебные искры (Переход с японским колоритом и черной клавишей F#4)
+      { note: 'G4', duration: 180 },
+      { note: 'A4', duration: 180 },
+      { note: 'B4', duration: 220 },
+      { note: 'C5', duration: 340 },
+      { note: 'D4', duration: 180 },
+      { note: 'F#4', duration: 240 }, // Черная клавиша '8' (искра)
+      { note: 'A4', duration: 240 },
+      { note: 'G4', duration: 420 },
+      { note: 'rest', duration: 120 },
+
+      // Фраза 4: Торжественный финал (Каскадное арпеджио и праздничный колокольчик)
+      { note: 'C4', duration: 160 },
+      { note: 'E4', duration: 160 },
+      { note: 'G4', duration: 180 },
+      { note: 'C5', duration: 280 },
+      { note: 'B4', duration: 180 },
+      { note: 'A4', duration: 180 },
+      { note: 'G4', duration: 200 },
+      { note: 'F4', duration: 180 },
+      { note: 'E4', duration: 200 },
+      { note: 'D4', duration: 220 },
+      { note: 'C4', duration: 260 },
+      { note: 'C5', duration: 620 }  // Финальный звонкий аккорд
+    ];
+
+    async function toggleHelloKittySong() {
+      ensureAudioContext();
+      const starBtn = document.getElementById('btnMelodyStar');
+      const screenTag = document.getElementById('screenThemeTag');
+
+      if (synthAudio.isPlayingTheme) {
+        synthAudio.isPlayingTheme = false;
+        if (starBtn) starBtn.classList.remove('animate-bounce');
+        if (screenTag) screenTag.textContent = 'READY';
+        return;
+      }
+
+      synthAudio.isPlayingTheme = true;
+      if (starBtn) starBtn.classList.add('animate-bounce');
+      if (screenTag) screenTag.textContent = 'KITTY THEME ✨';
+
+      const freqDict = {};
+      WHITE_NOTES.forEach(k => { freqDict[k.note] = k.freq; });
+      BLACK_NOTES.forEach(k => { freqDict[k.note] = k.freq; });
+
+      for (const item of kittyThemeNotes) {
+        if (!synthAudio.isPlayingTheme) break;
+
+        if (item.note !== 'rest' && freqDict[item.note]) {
+          triggerNoteOn(freqDict[item.note], item.note);
+          await new Promise(r => setTimeout(r, item.duration * 0.78));
+          triggerNoteOff(item.note);
+          await new Promise(r => setTimeout(r, item.duration * 0.22));
+        } else {
+          await new Promise(r => setTimeout(r, item.duration));
+        }
+      }
+
+      synthAudio.isPlayingTheme = false;
+      if (starBtn) starBtn.classList.remove('animate-bounce');
+      if (screenTag) screenTag.textContent = 'READY';
+    }
+
+    const starBtn = document.getElementById('btnMelodyStar');
+    if (starBtn) {
+      starBtn.addEventListener('click', toggleHelloKittySong);
+    }
+    const landing = document.getElementById('landingScreen');
+    const player = document.getElementById('synthScreen');
+    const btnOpen = document.getElementById('btnOpenSynth');
+    const btnBack = document.getElementById('btnBackHome');
+
+    if (btnOpen) {
+      btnOpen.addEventListener('click', () => {
+        ensureAudioContext();
+        if (landing) landing.classList.add('hidden');
+        if (player) {
+          player.classList.remove('hidden');
+          player.classList.add('flex');
+        }
+      });
+    }
+
+    if (btnBack) {
+      btnBack.addEventListener('click', () => {
+        synthAudio.isPlayingTheme = false;
+        if (player) {
+          player.classList.add('hidden');
+          player.classList.remove('flex');
+        }
+        if (landing) landing.classList.remove('hidden');
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      buildPiano();
+    });
+  </script>
+</body>
+</html>
